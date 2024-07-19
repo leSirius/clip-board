@@ -1,0 +1,11 @@
+@use '../colors';
+
+
+.selectList {
+  background-color: colors.$gray3;
+  width: 20%;
+  height: 100vh;
+  display: flex;
+  flex-flow: column;
+  place-content: center;
+}

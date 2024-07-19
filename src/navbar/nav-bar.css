@@ -1,0 +1,10 @@
+.selectList {
+  background-color: #353535;
+  width: 20%;
+  height: 100vh;
+  display: flex;
+  flex-flow: column;
+  place-content: center;
+}
+
+/*# sourceMappingURL=nav-bar.css.map */

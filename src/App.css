@@ -1,0 +1,12 @@
+#root {
+  margin: 0 auto;
+  text-align: center;
+}
+
+#main {
+  width: 100%;
+  display: flex;
+  flex-flow: row;
+}
+
+/*# sourceMappingURL=App.css.map */
