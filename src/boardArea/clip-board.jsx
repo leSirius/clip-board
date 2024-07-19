@@ -35,7 +35,7 @@ export default function ClipBoard() {
     if (!init) { timer.current = setTimeout(async ()=>{
       const data = await fetch('/receive', fetchSetting(content));
       const newContent = (await data.json()).content;
-      if (newContent!==content) {  setContent(newContent); }
+     checkSet(newContent);
     }, 500); }
     return ()=>{
       clearTimeout(timer.current);

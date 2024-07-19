@@ -102,6 +102,7 @@ app.get('/', async (req, res) => {
 })
 
 app.get('/connect', (req, res)=>{
+  clients.push(res);
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("Cache-Control", "no-cache");
