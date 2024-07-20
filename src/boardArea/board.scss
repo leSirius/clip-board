@@ -1,10 +1,16 @@
-@use '../colors';
+@use '../common';
 
 .board {
-  background-color: colors.$gray1;
+  background-color: common.$gray1;
   flex-grow: 1;
   padding: 3rem 6rem;
   text-align: left;
+}
+
+.titleBox {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
 }
 
 .title {
@@ -12,7 +18,7 @@
 }
 
 .inputArea {
-  background-color: colors.$gray2;
+  background-color: common.$gray2;
   padding: 0.5rem;
   font-size: 1rem;
   width: 100%;
@@ -22,5 +28,5 @@
 }
 
 button {
-  background-color: colors.$gray3;
+  @include common.button1;
 }

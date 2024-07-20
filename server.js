@@ -40,7 +40,6 @@ if (!isProduction) {
 
 // Serve HTML
 app.get('/', async (req, res) => {
-
   try {
     const url = req.originalUrl.replace(base, '')
 
@@ -103,11 +102,14 @@ app.get('/', async (req, res) => {
 
 app.get('/connect', (req, res)=>{
   clients.push(res);
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
+
   res.write(`event: connect\ndata: 1\n\n`);
+  isProduction && res.flush();
+
   res.on('close', ()=>{
     clients.splice(clients.indexOf(res), 1);
     res.end();
@@ -118,7 +120,7 @@ app.get('/connect', (req, res)=>{
 app.use('/receive', express.urlencoded({extended: false}));
 app.use('/receive', express.json());
 app.post('/receive', async (req, res)=>{
-   res.send({content:req.body.content});
+  res.send({content:'got it'});
   broadCast(req, res);
 })
 
@@ -129,8 +131,12 @@ app.listen(port, () => {
 })
 
 function broadCast(req, res) {
-
+  console.log(`CLIENTS LENGTH: ${clients.length}`)
   const message = `event: message\ndata: ${req.body.content}\n\n`;
-  clients.forEach(client=>client.write(message));
+  clients.forEach(client=>{
+    if (res===client) { return ; }
+    client.write(message);
+    isProduction && client.flush();
+  });
 }
 

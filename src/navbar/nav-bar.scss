@@ -1,8 +1,8 @@
-@use '../colors';
+@use '../common';
 
 
 .selectList {
-  background-color: colors.$gray3;
+  background-color: common.$gray3;
   width: 20%;
   height: 100vh;
   display: flex;
