@@ -29,7 +29,7 @@ export default function Prompt({setShowOverlay}) {
           <button key={item.tag} className='button2' onClick={item.handler}>{item.tag}</button>
         )}
 
-        <p>If you haven't got a key yet, please generate one, and then enter it to another device.</p>
+        <p className='hint'>If you haven't got a key, please generate one, and then enter it to another device with the same name.</p>
       </div>
 
     </div>

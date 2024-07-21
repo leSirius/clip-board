@@ -85,9 +85,14 @@
 }
 
 .input-login {
+  background-color: #2e2e2e;
   letter-spacing: 0.25px;
   padding-left: 0.25rem;
   height: 1.75rem;
+}
+
+.hint {
+  padding-left: 0.5rem;
 }
 
 /*# sourceMappingURL=board.css.map */

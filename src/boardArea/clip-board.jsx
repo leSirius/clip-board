@@ -8,7 +8,7 @@ export default function ClipBoard() {
   const [connected, setConnected] = useState(false);
   const [content, setContent] = useState('');
   const [showOverlay, setShowOverlay] = useState(true);
-  
+
   const timerId = useRef(null);
   const lastUpdate = useRef(getTimeStamp());
   const eventRef = useRef(null);

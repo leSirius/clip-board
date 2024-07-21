@@ -63,7 +63,12 @@
 }
 
 .input-login {
+  background-color: common.$gray2;
   letter-spacing: .25px;
   padding-left: .25rem;
   height: 1.75rem;
+}
+
+.hint {
+  padding-left: .5rem;
 }
