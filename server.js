@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import express from 'express'
-import { Transform } from 'node:stream'
+import {Transform} from 'node:stream'
 
 // Constants
 const isProduction = process.env.NODE_ENV === 'production'
@@ -24,9 +24,9 @@ const app = express()
 // Add Vite or respective production middlewares
 let vite
 if (!isProduction) {
-  const { createServer } = await import('vite')
+  const {createServer} = await import('vite')
   vite = await createServer({
-    server: { middlewareMode: true },
+    server: {middlewareMode: true},
     appType: 'custom',
     base
   })
@@ -35,7 +35,7 @@ if (!isProduction) {
   const compression = (await import('compression')).default
   const sirv = (await import('sirv')).default
   app.use(compression())
-  app.use(base, sirv('./dist/client', { extensions: [] }))
+  app.use(base, sirv('./dist/client', {extensions: []}))
 }
 
 // Serve HTML
@@ -57,15 +57,15 @@ app.get('/', async (req, res) => {
 
     let didError = false
 
-    const { pipe, abort } = render(url, ssrManifest, {
+    const {pipe, abort} = render(url, ssrManifest, {
       onShellError() {
         res.status(500)
-        res.set({ 'Content-Type': 'text/html' })
+        res.set({'Content-Type': 'text/html'})
         res.send('<h1>Something went wrong</h1>')
       },
       onShellReady() {
         res.status(didError ? 500 : 200)
-        res.set({ 'Content-Type': 'text/html' })
+        res.set({'Content-Type': 'text/html'})
 
         const transformStream = new Transform({
           transform(chunk, encoding, callback) {
@@ -100,7 +100,7 @@ app.get('/', async (req, res) => {
   }
 })
 
-app.get('/connect', (req, res)=>{
+app.get('/connect', (req, res) => {
   clients.push(res);
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Content-Type', 'text/event-stream');
@@ -110,7 +110,7 @@ app.get('/connect', (req, res)=>{
   res.write(`event: connect\ndata: 1\n\n`);
   isProduction && res.flush();
 
-  res.on('close', ()=>{
+  res.on('close', () => {
     clients.splice(clients.indexOf(res), 1);
     res.end();
   })
@@ -119,8 +119,8 @@ app.get('/connect', (req, res)=>{
 
 app.use('/receive', express.urlencoded({extended: false}));
 app.use('/receive', express.json());
-app.post('/receive', async (req, res)=>{
-  res.send({content:'got it'});
+app.post('/receive', async (req, res) => {
+  res.send({content: 'got it'});
   broadCast(req, res);
 })
 
@@ -131,10 +131,13 @@ app.listen(port, () => {
 })
 
 function broadCast(req, res) {
-  console.log(`CLIENTS LENGTH: ${clients.length}`)
-  const message = `event: message\ndata: ${req.body.content}\n\n`;
-  clients.forEach(client=>{
-    if (res===client) { return ; }
+  console.log(`CLIENTS LENGTH: ${clients.length}`);
+  const ob = {content: req.body.content, update: req.body.update}
+  const message = `event: message\ndata: ${JSON.stringify(ob)}\n\n`;
+  clients.forEach(client => {
+    if (res === client) {
+      return;
+    }
     client.write(message);
     isProduction && client.flush();
   });

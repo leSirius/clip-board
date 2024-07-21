@@ -1,9 +1,12 @@
 
 $gray1: #1a1a1a;
-$gray2: #242424;
+$gray2: #2e2e2e;
 $gray3: #353535;
+$gray4: #424242;
+$gray5: #505050;
+$gray7: #707070;
 
-@mixin button1($color: gray3){
+@mixin button-common($color: $gray7){
   background-color: $color;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -13,10 +16,9 @@ $gray3: #353535;
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.25s;
-  outline: none;
 
   &:hover {
-    border-color: #646cff;
+    border-color: #6f6fff;
     opacity: 70%;
   }
 }
