@@ -1,56 +1,83 @@
-import CryptoJS from "crypto-js"
 import {useEffect, useRef, useState} from "react";
 import Prompt from "./Prompt.jsx";
+import {cipher, decipher, storageFunc, getTimeStamp, makeFetch, postSetting} from "../toolkit/utility.js";
 
 const delay = 600;
+const urls = {
+  authConnect: '/auth-connect',
+  connect: '/connect',
+  receive: '/receive',
+}
+
 
 export default function ClipBoard() {
-  const [connected, setConnected] = useState(false);
+  // const [connected, setConnected] = useState(false);
   const [content, setContent] = useState('');
-  const [showOverlay, setShowOverlay] = useState(true);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const timerId = useRef(null);
   const lastUpdate = useRef(getTimeStamp());
   const eventRef = useRef(null);
-  const cipherKey = useRef('');
+  const userRef = useRef("");
+  const keyRef = useRef("");
+  const tokenRef = useRef("");
 
   useEffect(() => {
-    let keyString = localStorage.getItem('key');
-    if (!keyString) {
-      keyString = genKey();
-      localStorage.setItem('key', keyString);
-    }
-    cipherKey.current = keyString;
+    const [name, key] = storageFunc.getIterable(['name', 'key']);
+    if (name && key) { setUserInfo(name, key); }
+    else { setShowOverlay(true); }
   }, []);
-
+  /*
   useEffect(() => {
-    if (eventRef.current === null) {
-      eventRef.current = connectSSE();
+    if (tokenRef.current!=="") {
+      eventRef.current = authConnect(tokenRef.current);
     }
+    return disAuthConnect;
+
+  }, [showOverlay]);
+   */
+  useEffect(() => {
+    if (eventRef.current === null) { eventRef.current = connectSSE(); }
     return disConnectSSE;
   }, []);
 
+
   return (
     <>
-      {showOverlay && <Prompt setShowOverlay={setShowOverlay}></Prompt>}
+      {showOverlay && <Prompt setShowOverlay={setShowOverlay} setUserInfo={setUserInfo}></Prompt>}
       <div className='titleBox'>
-        <h2 className='title'>Clip Board</h2>
-        <span>{connected ? 'Online' : 'Offline'}</span>
+        <h2>Clip Board</h2>
+        <p>
+          <b>{showInfo? `${userRef.current}`: ""}</b>
+          <span className='unselect'>&nbsp;&nbsp;</span>
+          {showInfo? `${keyRef.current}`: ""}
+          <span className='unselect'>&nbsp;&nbsp;&nbsp;</span>
+          <button className='button-sm unselect' onClick={()=>setShowInfo(!showInfo)}>
+            {showInfo? "Hide Info":"Show Info"}
+          </button>
+        </p>
       </div>
 
-      <textarea className='inputArea' value={content} onChange={handleChange}/>
+      <textarea className='text-area' value={content} onChange={handleTextInput}/>
 
-      <div style={{textAlign: 'right'}}>
+      <div className='button-box'>
         <button className='button1'>Copy</button>
       </div>
     </>
   )
 
-  function handleChange(e) {
+  function setUserInfo(name, key) {
+    userRef.current = name;
+    keyRef.current = key;
+    tokenRef.current = cipher(name, key);
+  }
+
+  function handleTextInput(e) {
     timerId.current && clearTimeout(timerId.current);
     const text = e.target.value;
     const stamp = getTimeStamp();
-    setTextAndTime(text, stamp)
+    setTextAndTime(text, stamp);
     timerId.current = sendText({content: text, update: stamp});
   }
 
@@ -61,17 +88,37 @@ export default function ClipBoard() {
     }
   }
 
-  function connectSSE() {
-    const connect = new EventSource('/connect');
-    connect.addEventListener('connect', (e) => {
-      setConnected(e.data === '1');
+
+  function authConnect(token) {
+    console.log( {...postSetting, body: JSON.stringify({token})} );
+    const authConnect = new EventSource(urls.authConnect, {
+      ...postSetting,
+      body: JSON.stringify({token})
     });
-    connect.addEventListener('message', e => {
-      const ob = JSON.parse(e.data);
-      const [message, update] = [decipher(ob.content, cipherKey.current), ob.update];
-      setTextAndTime(message, update);
-    })
+    authConnect.addEventListener('connect', e=> console.log);
+    authConnect.addEventListener('message', onMessage);
+    return authConnect;
+  }
+
+  function disAuthConnect() {
+    eventRef.current && eventRef.current.close();
+    eventRef.current = null;
+  }
+
+  function connectSSE() {
+    const connect = new EventSource(urls.connect);
+    connect.addEventListener('connect', (e) => { });
+    connect.addEventListener('message', onMessage);
     return connect;
+  }
+
+  function onMessage(e) {
+    const ob = JSON.parse(e.data)
+    const [message, update] = [
+      decipher(ob.content, keyRef.current),
+      Number(decipher(ob.update, keyRef.current))
+    ];
+    setTextAndTime(message, update);
   }
 
   function disConnectSSE() {
@@ -80,53 +127,32 @@ export default function ClipBoard() {
   }
 
   function sendText({content, update}) {
-    const postSet = {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'}
-    }
-    return setTimeout(makeRequest, delay);
-
-    async function makeRequest() {
-      const encrypted = cipher(content, cipherKey.current);
-      try {
-        const res = await fetch(
-          '/receive', {...postSet, body: JSON.stringify({content: encrypted, update})}
-        );
-        checkRes(res);
-      } catch (e) {
-        console.error('----------error---------', e.message);
-      }
-    }
-  }
-
-  function checkRes(res) {
-    if (!res.ok || res.status !== 200) {
-      throw new Error(`failed to send text: ${res.status}`)
+    return setTimeout(encryptFetch, delay);
+    function encryptFetch() {
+      const encryptText = cipher(content, keyRef.current);
+      const encryptTime = cipher(update.toString(), keyRef.current);
+      const body = JSON.stringify({content:encryptText, update:encryptTime});
+      makeFetch(urls.receive, true, body);
+      // don't need the response of the fetch in this function. Error handler is wrapped inside.
     }
   }
 }
 
-function cipher(text, key) {
-  return CryptoJS.AES.encrypt(text, key).toString();
-}
 
-function decipher(encrypted, key) {
-  return CryptoJS.AES.decrypt(encrypted, key).toString(CryptoJS.enc.Utf8);
-}
-
-
-function getTimeStamp() {
-  return new Date().getTime();
-}
-
-function genKey() {
-  // return  CryptoJS.lib.WordArray.random(16);
-  const charSet = "0123456789";
-  const size = charSet.length;
-  let key = '';
-  for (let i = 0; i < 16; i++) {
-    const random = Math.floor(Math.random() * size);
-    key += charSet[random];
+/*
+  async function makeRequest() {
+    const encrypted = cipher(content, keyRef.current);
+    console.log({ body: JSON.stringify({content: encrypted, update})});
+    try {
+      const res = await fetch(
+        '/receive', {...postSet, body: JSON.stringify({content: encrypted, update})}
+      );
+      checkRes(res);
+      const data = await res;
+      return data;
+    } catch (e) {
+      console.error('----------error---------', e.message);
+    }
   }
-  return key;
-}
+ */
+

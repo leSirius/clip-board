@@ -3,20 +3,24 @@ import express from 'express'
 import {Transform} from 'node:stream'
 
 // Constants
+// sirius 1111111111111111 Eq/QbSt9kKwbdcvYQ+VfuQ==    sirius 2222222222222222 lGu/FRhEiq7F8vgfjraEHA==
 const isProduction = process.env.NODE_ENV === 'production'
 const port = process.env.PORT || 3000
 const base = process.env.BASE || '/'
-const ABORT_DELAY = 10000
+const ABORT_DELAY = 10000;
 const clients = [];
 
+const registered = new Set(['Eq/QbSt9kKwbdcvYQ+VfuQ==', 'lGu/FRhEiq7F8vgfjraEHA==']);
+const connectMap = new Map();
 
 // Cached production assets
 const templateHtml = isProduction
   ? await fs.readFile('./dist/client/index.html', 'utf-8')
-  : ''
+  : '' ;
 const ssrManifest = isProduction
   ? await fs.readFile('./dist/client/.vite/ssr-manifest.json', 'utf-8')
-  : undefined
+  : undefined ;
+
 
 // Create http server
 const app = express()
@@ -38,8 +42,114 @@ if (!isProduction) {
   app.use(base, sirv('./dist/client', {extensions: []}))
 }
 
-// Serve HTML
-app.get('/', async (req, res) => {
+// ---------------------------------- All Paths ----------------------------------
+app.post("*", express.urlencoded({extended: false}));
+app.post("*", express.json());
+
+app.get('/', requestRoot);
+
+app.post('/auth', (req, res)=>{
+  const {token, newUser} = req.body;
+  const validUser = authentication(token, newUser);
+
+  res.send({validUser});
+})
+
+app.get('/connect', (req, res) => {
+  clients.push(res);
+  buildConnect(res);
+  res.on('close', removeClient);
+
+  function removeClient() {
+    clients.splice(clients.indexOf(res), 1);
+    res.end();
+  }
+})
+
+app.post('/receive', async (req, res) => {
+  res.status(200).end();
+  broadCast(req);
+})
+
+app.post('/auth-connect', (req, res) => {
+  const {token, newUser} = req.body;
+  const isValid = authentication(token, newUser);
+  if (isValid) {
+    addToGroup(token, res);
+    buildConnect(res);
+  } else {
+    res.send({isValid: false});
+  }
+})
+
+app.post('/update-text', (req, res) => {
+  res.send({content: 'received'});
+  const [token, content, update] = [req.body.token, req.body.content, req.body.update];
+  groupCast(token, content, update);
+})
+
+
+// Start http server
+app.listen(port, () => {
+  console.log(`Server started at http://localhost:${port}`)
+})
+
+
+
+function authentication (token, newUser) {
+  let validUser = false;
+  if (!newUser) {
+    if (registered.has(token)) {
+      validUser = true;
+    }
+  }
+  return validUser;
+}
+
+function addToGroup(token, res) {
+  if (!connectMap.has(token)) { connectMap.set(token, []); }
+  connectMap.get(token).push(res);
+  res.on('close', () => {
+    const group = connectMap.get(token);
+    group.splice(group.indexOf(res), 1);
+    res.end();
+  })
+}
+
+function buildConnect(res) {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  res.write(`event: connect\ndata: 'connected'\n\n`);
+  isProduction && res.flush();
+}
+
+function groupCast(token, content, update) {
+  const group = connectMap.get(token);
+  const message = `event: message\ndata: ${JSON.stringify({content, update})}\n\n`;
+  group.forEach(client => {
+    client.write(message);
+    isProduction && client.flush();                              // move to end?
+  });
+  console.log(`user ${token} has ${group.length} connection`);
+}
+
+function broadCast(req) {
+  console.log(`CLIENTS LENGTH: ${clients.length}`);
+  const ob = req.body;
+  console.log(req.body.content);
+  // const ob = {content: req.body.content, update: req.body.update}
+  const message = `event: message\ndata: ${JSON.stringify(ob)}\n\n`;
+  clients.forEach(client => {
+    client.write(message);
+    isProduction && client.flush();
+  });
+}
+
+
+// Vite template code  // Serve HTML
+async function requestRoot(req, res) {
   try {
     const url = req.originalUrl.replace(base, '')
 
@@ -98,48 +208,4 @@ app.get('/', async (req, res) => {
     console.log(e.stack)
     res.status(500).end(e.stack)
   }
-})
-
-app.get('/connect', (req, res) => {
-  clients.push(res);
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  res.write(`event: connect\ndata: 1\n\n`);
-  isProduction && res.flush();
-
-  res.on('close', () => {
-    clients.splice(clients.indexOf(res), 1);
-    res.end();
-  })
-})
-
-
-app.use('/receive', express.urlencoded({extended: false}));
-app.use('/receive', express.json());
-app.post('/receive', async (req, res) => {
-  res.send({content: 'got it'});
-  broadCast(req, res);
-})
-
-
-// Start http server
-app.listen(port, () => {
-  console.log(`Server started at http://localhost:${port}`)
-})
-
-function broadCast(req, res) {
-  console.log(`CLIENTS LENGTH: ${clients.length}`);
-  const ob = {content: req.body.content, update: req.body.update}
-  const message = `event: message\ndata: ${JSON.stringify(ob)}\n\n`;
-  clients.forEach(client => {
-    if (res === client) {
-      return;
-    }
-    client.write(message);
-    isProduction && client.flush();
-  });
 }
-
