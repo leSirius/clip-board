@@ -1,5 +1,11 @@
 import CryptoJS from "crypto-js";
 
+export const urls = {
+  eventSource: "/eventsource",
+  identify: "/identify",
+  text: "/text"
+}
+
 const iv = new Array(16).fill(String.fromCharCode(0)).join('');
 const ivEncoded   = CryptoJS.enc.Utf8.parse(iv);
 const encryptSetting = {
@@ -24,12 +30,14 @@ export function decipher(encrypted, key) {
 
 export function getTimeStamp() { return new Date().getTime(); }
 
-export async function makeFetch(url, isPost=false, body) {
+export async function makeFetch(url, isPost=false, body, needReturn=false) {
+  if (typeof body!=='string') { body = JSON.stringify(body); }
   try {
     let res;
     if (!isPost) { res = await fetch(url); }
     else { res = await fetch(url, {...postSetting, body}); }
     checkRes(res);
+    return needReturn? await res.json():null;
   } catch (e) {
     console.error('----------error---------', e.message);
   }
@@ -75,3 +83,69 @@ export const storageFunc = {
 
   clear() { localStorage.clear(); }
 }
+
+export function randomString(length) {
+  // CryptoJS.lib.WordArray.random(16);
+  const charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const size = charSet.length;
+  let key = '';
+  for (let i = 0; i < length; i++) {
+    const random = Math.floor(Math.random() * size);
+    key += charSet[random];
+  }
+  return key;
+}
+
+export function promisifyEventSource(token, newUser) {
+  const {promise, resolve, reject} = Promise.withResolvers();
+  const eventOb = new EventSource(urls.eventSource);
+  let identifier;
+  setConnectListeners();
+  return promise
+
+  function setConnectListeners() {
+    // For connection process, burn after calling. (one-time-use)
+    eventOb.addEventListener('identifier', onIdentify);
+    eventOb.addEventListener('success', onSuccess);
+    eventOb.addEventListener('fail', onFail);
+  }
+  function onIdentify(e) {
+    identifier = JSON.parse(e.data).identifier;
+    makeFetch(urls.identify, true, {token, identifier, newUser},false);
+  }
+  function onSuccess(e) {
+    resolve({eventOb, identifier, count:JSON.parse(e.data).count})
+  }
+  function onFail(e) {
+    eventOb.close();
+    reject({message:e.data} );
+  }
+}
+
+
+/*
+export async function makeEventObject(token, newUser, callbacks) {
+  const eventOb = new EventSource(urls.eventSource);
+  let identifier;
+  eventOb.addEventListener('identifier', onIdentify);
+  eventOb.addEventListener('success', onSuccess);
+  eventOb.addEventListener('message', callbacks.onMessage);
+  eventOb.addEventListener('fail', onFail);
+  return eventOb;
+
+  function onIdentify(e) {
+    identifier = JSON.parse(e.data).identifier;
+    makeFetch(urls.identify, true, {token, identifier, newUser},false);
+  }
+
+  function onSuccess() {
+    callbacks.success(identifier);
+  }
+
+  function onFail(e) {
+    eventOb.close();
+    callbacks.fail(e.data);
+  }
+}
+*/
+

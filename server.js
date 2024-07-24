@@ -1,18 +1,48 @@
 import fs from 'node:fs/promises'
 import express from 'express'
 import {Transform} from 'node:stream'
+import {getTimeStamp, randomString, urls} from "./src/toolkit/utility.js";
 
 // Constants
-// sirius 1111111111111111 Eq/QbSt9kKwbdcvYQ+VfuQ==    sirius 2222222222222222 lGu/FRhEiq7F8vgfjraEHA==
+
 const isProduction = process.env.NODE_ENV === 'production'
 const port = process.env.PORT || 3000
 const base = process.env.BASE || '/'
 const ABORT_DELAY = 10000;
 const clients = [];
 
+// sirius 1111111111111111 Eq/QbSt9kKwbdcvYQ+VfuQ==    sirius 2222222222222222 lGu/FRhEiq7F8vgfjraEHA==
 const registered = new Set(['Eq/QbSt9kKwbdcvYQ+VfuQ==', 'lGu/FRhEiq7F8vgfjraEHA==']);
-const connectMap = new Map();
+const loginKeyBuffer = new Map();
+const connectMap = new Map();                     // set(token, [])
+const waitingRes = new Map();                     // set(identifier, {res, time:getTimeStamp()})
+const identifierMap = new Map();                  // set(identifier, {token, eventRes:res})
+setInterval(()=>{
+  for (const [identifier, {res, time}] of waitingRes) {
+    if (getTimeStamp()-time>2000) {
+      res.end();
+      popFromWaiting(identifier);
+      deleteFromIdMap(identifier);
+    }
+  }
+  /*
+  console.log('----------------------------------');
+  console.log("waitingRes: ", waitingRes.size);
+  console.log("identifierMap: ", identifierMap.size);
 
+
+  console.log('after clean !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+  console.log('Registered', registered.size);
+  console.log('connectMap:')
+  for (const item of connectMap) {
+    console.log('  ',item[0], item[1].length);
+  }
+  console.log("waitingRes: ", waitingRes.size);
+  console.log("identifierMap: ", identifierMap.size);
+  console.log(' ');
+  */
+}, 5000);
+// ---------------------------------- Init ----------------------------------
 // Cached production assets
 const templateHtml = isProduction
   ? await fs.readFile('./dist/client/index.html', 'utf-8')
@@ -20,7 +50,6 @@ const templateHtml = isProduction
 const ssrManifest = isProduction
   ? await fs.readFile('./dist/client/.vite/ssr-manifest.json', 'utf-8')
   : undefined ;
-
 
 // Create http server
 const app = express()
@@ -38,26 +67,192 @@ if (!isProduction) {
 } else {
   const compression = (await import('compression')).default
   const sirv = (await import('sirv')).default
-  app.use(compression())
+  app.use(compression());
   app.use(base, sirv('./dist/client', {extensions: []}))
 }
 
-// ---------------------------------- All Paths ----------------------------------
+// ---------------------------------- Paths ----------------------------------
+app.get('/', requestRoot);
 app.post("*", express.urlencoded({extended: false}));
 app.post("*", express.json());
 
-app.get('/', requestRoot);
+app.get(urls.eventSource, (req, res)=>{
+  const identifier = randomString(8);
+  setEventHeaders(res);
+  addToWaiting(identifier, res);
+  sendSingleEvent(res,'identifier', {identifier})
+});
 
+app.post(urls.identify, (req, res)=>{
+  const {token, identifier, newUser} = req.body;
+  const eventRes = popFromWaiting(identifier);
+  if (isInvalidAndReject(res, eventRes, token, newUser, identifier)) { return ; }
+  addToIdMap(identifier, token, eventRes);
+  addToGroup(token, eventRes, identifier);
+  sendSingleEvent(eventRes, 'success', {count:getGroupSize(token)});
+  res.end();
+  const message = eventMaker('count', {count:getGroupSize(token)});
+  groupCast(token, message, eventRes);
+});
+
+app.post(urls.text, (req, res)=>{
+  const {identifier, content, update} = req.body;
+  if (!hasInIdMap(identifier)) { res.end(); return; }
+  const {token, eventRes} = getFromIdMap(identifier);
+  const message = eventMaker('message', {content, update});
+  groupCast(token, message, eventRes);
+  res.end();
+})
+
+// Start http server
+app.listen(port, () => {
+  console.log(`Server started at http://localhost:${port}`)
+})
+
+// ---------------------------------- New Helpers ----------------------------------
+
+// `````````````````````````````````` Res Handlers and others``````````````````````````````````
+function authentication (token, newUser) {
+  newUser && registered.add(token);
+  return registered.has(token);
+}
+
+function invalidMessage(token, newUser, identifier) {
+  return !authentication(token, newUser) ?
+    `Invalid token: ${token}.` : `Invalid identifier: ${identifier}.`;
+}
+function setEventHeaders(res) {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+}
+function eventMaker(type, data) {
+  const typeList = new Set(["identifier", "success", "fail", "count", "message", "reduce"]);
+  if (!typeList.has(type)) { console.log(`Non-recorded event type ${type} !!!!!!!!!!!!!!!!!!!!!!!!!!!!`); }
+
+  if (typeof data!=='string') { data = JSON.stringify(data); }
+  return `event: ${type}\ndata: ${data}\n\n`;
+  // `event: message\ndata: ${JSON.stringify({content, update})}\n\n`;
+}
+function writeFlush(res, message) {
+  res.write(message);
+  isProduction && res.flush();
+}
+function sendSingleEvent(res, type, data) {
+  writeFlush(res, eventMaker(type, data));
+}
+function isInvalidAndReject(res, eventRes, token, newUser, identifier) {
+  // waitingRes map has been cleaned in previous pop
+  if (!eventRes || !authentication(token, newUser)) {
+    const message = invalidMessage(token, newUser, identifier);
+    rejectRes(res, message);
+    eventRes && sendSingleEvent(eventRes, 'fail', message.split(":")[0]);
+    return true;
+  }
+  return false;
+}
+function rejectRes(res, reason) {
+  res.send({info: reason});
+}
+function closeCleanWrapper(token, identifier, res) {
+  return () =>{
+    deleteFromIdMap(identifier);
+    cleanGroup(res, token)
+    res.end();
+  }
+}
+// `````````````````````````````````` Waiting Handlers ``````````````````````````````````
+function addToWaiting(identifier, res) {
+  waitingRes.set(identifier, {res, time:getTimeStamp()});
+}
+
+function hasInWaiting(identifier) {
+  return waitingRes.has(identifier);
+}
+
+function popFromWaiting(identifier) {
+  if (!hasInWaiting(identifier)) { return void 0; }
+  const res = waitingRes.get(identifier).res;
+  waitingRes.delete(identifier);
+  return res;
+}
+// `````````````````````````````````` IdentifierMap Handlers ``````````````````````````````````
+function addToIdMap(identifier, token, res) {
+  identifierMap.set(identifier, {token, eventRes:res});
+}
+
+function hasInIdMap(identifier) {
+  return identifierMap.has(identifier);
+}
+
+function getFromIdMap(identifier) {
+  if (!hasInIdMap(identifier)) { return void 0; }
+  return identifierMap.get(identifier);
+}
+
+function deleteFromIdMap(identifier) {
+  identifierMap.delete(identifier)
+}
+
+// `````````````````````````````````` ConnectMap Handlers ``````````````````````````````````
+function groupCast(token, message, except) {
+  const group = getGroup(token);
+  group.forEach(client => { (client!==except) && writeFlush(client, message); });
+}
+
+function addToGroup(token, res, identifier) {
+  if (!hasGroup(token)) { addNewGroup(token); }
+  const group = getGroup(token);
+  group.push(res);
+  res.on('close', closeCleanWrapper(token, identifier, res));
+}
+
+function hasGroup(token) {
+  return connectMap.has(token);
+}
+function getGroup(token) {
+  return connectMap.get(token);
+}
+function getGroupSize(token) {
+  if (!hasGroup(token)) { return 0; }
+  return getGroup(token).length;
+}
+
+function addNewGroup(token) {
+  if (connectMap.has(token)) { return ; }
+  connectMap.set(token, []);
+}
+
+function cleanGroup(res, token) {
+  const group = getGroup(token);
+  const index = group.indexOf(res)
+  group.splice(index, 1);
+  if (group.length===0) { deleteGroup(token); }
+  else {
+    group.forEach((client,ind)=>{
+      const message = ind<index
+        ? eventMaker('reduce', {deviceNum:0, total:-1})
+        : eventMaker('reduce', {deviceNum:-1, total:-1});
+      writeFlush(client, message);
+    })
+  }
+}
+
+function deleteGroup(token) {
+  connectMap.delete(token);
+}
+
+// ---------------------------------- Ancient APIs ----------------------------------
 app.post('/auth', (req, res)=>{
   const {token, newUser} = req.body;
   const validUser = authentication(token, newUser);
-
   res.send({validUser});
 })
 
 app.get('/connect', (req, res) => {
   clients.push(res);
-  buildConnect(res);
+  setEventHeaders(res);
   res.on('close', removeClient);
 
   function removeClient() {
@@ -71,84 +266,9 @@ app.post('/receive', async (req, res) => {
   broadCast(req);
 })
 
-app.post('/auth-connect', (req, res) => {
-  const {token, newUser} = req.body;
-  const isValid = authentication(token, newUser);
-  if (isValid) {
-    addToGroup(token, res);
-    buildConnect(res);
-  } else {
-    res.send({isValid: false});
-  }
-})
-
-app.post('/update-text', (req, res) => {
-  res.send({content: 'received'});
-  const [token, content, update] = [req.body.token, req.body.content, req.body.update];
-  groupCast(token, content, update);
-})
 
 
-// Start http server
-app.listen(port, () => {
-  console.log(`Server started at http://localhost:${port}`)
-})
-
-
-
-function authentication (token, newUser) {
-  let validUser = false;
-  if (!newUser) {
-    if (registered.has(token)) {
-      validUser = true;
-    }
-  }
-  return validUser;
-}
-
-function addToGroup(token, res) {
-  if (!connectMap.has(token)) { connectMap.set(token, []); }
-  connectMap.get(token).push(res);
-  res.on('close', () => {
-    const group = connectMap.get(token);
-    group.splice(group.indexOf(res), 1);
-    res.end();
-  })
-}
-
-function buildConnect(res) {
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-  res.write(`event: connect\ndata: 'connected'\n\n`);
-  isProduction && res.flush();
-}
-
-function groupCast(token, content, update) {
-  const group = connectMap.get(token);
-  const message = `event: message\ndata: ${JSON.stringify({content, update})}\n\n`;
-  group.forEach(client => {
-    client.write(message);
-    isProduction && client.flush();                              // move to end?
-  });
-  console.log(`user ${token} has ${group.length} connection`);
-}
-
-function broadCast(req) {
-  console.log(`CLIENTS LENGTH: ${clients.length}`);
-  const ob = req.body;
-  console.log(req.body.content);
-  // const ob = {content: req.body.content, update: req.body.update}
-  const message = `event: message\ndata: ${JSON.stringify(ob)}\n\n`;
-  clients.forEach(client => {
-    client.write(message);
-    isProduction && client.flush();
-  });
-}
-
-
-// Vite template code  // Serve HTML
+//  ---------------------------------- Serve HTML (vite template) ----------------------------------
 async function requestRoot(req, res) {
   try {
     const url = req.originalUrl.replace(base, '')
@@ -208,4 +328,57 @@ async function requestRoot(req, res) {
     console.log(e.stack)
     res.status(500).end(e.stack)
   }
+}
+
+
+
+// ---------------------------------- Abandoned APIs ----------------------------------
+app.post('/authentication', (req, res)=>{
+  const {token, newUser} = req.body;
+  let loginKey = 'null';
+  if (authentication(token, newUser)) { loginKey = genAddGetKey(token); }
+  res.send({loginKey});
+})
+
+app.get('/auth-connect/', (req, res) => {
+  const token = checkDelKey(res.params.key);
+  if (token === null) {
+    res.send({content:"Can't find the login key."});
+    return ;
+  }
+  addToGroup(token, res);
+  setEventHeaders(res, token);
+  const countInfo = eventMaker('count', getGroup(token).length);
+  groupCast(token, countInfo);
+})
+
+app.post('/update-text', (req, res) => {
+  res.send({content: 'received'});
+  const [token, content, update] = [req.body.token, req.body.content, req.body.update];
+  const message = eventMaker('message', {content, update});
+  groupCast(token, message);
+})
+
+// `````````````````````````````````` Abandoned Functions ``````````````````````````````````
+function genAddGetKey(token) {
+  const loginKey = randomString(8);
+  loginKeyBuffer.set(loginKey, {token, time:getTimeStamp()});
+  return loginKey;
+}
+
+function checkDelKey(loginKey) {
+  if (!loginKeyBuffer.has(loginKey)) { return null; }
+  const token = loginKeyBuffer.get(loginKey).token;
+  loginKeyBuffer.delete(loginKey);
+  return token;
+}
+function broadCast(req) {
+  console.log(`CLIENTS LENGTH: ${clients.length}`);
+  const ob = req.body;
+  // const ob = {content: req.body.content, update: req.body.update}
+  const message = `event: message\ndata: ${JSON.stringify(ob)}\n\n`;
+  clients.forEach(client => {
+    client.write(message);
+    isProduction && client.flush();
+  });
 }

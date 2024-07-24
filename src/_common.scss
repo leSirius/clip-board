@@ -1,13 +1,12 @@
 
-$gray1: #1a1a1a;
-$gray2: #2e2e2e;
+$gray1: #1c1e1f;
+$gray2: #2f2f2f;
 $gray3: #353535;
 $gray4: #424242;
 $gray5: #505050;
 $gray7: #707070;
 
 @mixin button-common($color: $gray7){
-
   background-color: $color;
   border-radius: 8px;
   border: 1px solid transparent;
