@@ -12,35 +12,16 @@ const ABORT_DELAY = 10000;
 const clients = [];
 
 // sirius 1111111111111111 Eq/QbSt9kKwbdcvYQ+VfuQ==    sirius 2222222222222222 lGu/FRhEiq7F8vgfjraEHA==
-const registered = new Set(['Eq/QbSt9kKwbdcvYQ+VfuQ==', 'lGu/FRhEiq7F8vgfjraEHA==']);
-const loginKeyBuffer = new Map();
+const registered = new Map([
+  ['Eq/QbSt9kKwbdcvYQ+VfuQ==', {content:"", update:0}],
+  ['lGu/FRhEiq7F8vgfjraEHA==', {content:"", update:0}]
+]);
 const connectMap = new Map();                     // set(token, [])
 const waitingRes = new Map();                     // set(identifier, {res, time:getTimeStamp()})
 const identifierMap = new Map();                  // set(identifier, {token, eventRes:res})
 setInterval(()=>{
-  for (const [identifier, {res, time}] of waitingRes) {
-    if (getTimeStamp()-time>2000) {
-      res.end();
-      popFromWaiting(identifier);
-      deleteFromIdMap(identifier);
-    }
-  }
-  /*
-  console.log('----------------------------------');
-  console.log("waitingRes: ", waitingRes.size);
-  console.log("identifierMap: ", identifierMap.size);
-
-
-  console.log('after clean !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-  console.log('Registered', registered.size);
-  console.log('connectMap:')
-  for (const item of connectMap) {
-    console.log('  ',item[0], item[1].length);
-  }
-  console.log("waitingRes: ", waitingRes.size);
-  console.log("identifierMap: ", identifierMap.size);
-  console.log(' ');
-  */
+  cleanTimeOut();
+  logging();
 }, 5000);
 // ---------------------------------- Init ----------------------------------
 // Cached production assets
@@ -87,10 +68,11 @@ app.post(urls.identify, (req, res)=>{
   const {token, identifier, newUser} = req.body;
   const eventRes = popFromWaiting(identifier);
   if (isInvalidAndReject(res, eventRes, token, newUser, identifier)) { return ; }
+  res.end();
   addToIdMap(identifier, token, eventRes);
   addToGroup(token, eventRes, identifier);
   sendSingleEvent(eventRes, 'success', {count:getGroupSize(token)});
-  res.end();
+  sendCache(token, eventRes);
   const message = eventMaker('count', {count:getGroupSize(token)});
   groupCast(token, message, eventRes);
 });
@@ -99,6 +81,7 @@ app.post(urls.text, (req, res)=>{
   const {identifier, content, update} = req.body;
   if (!hasInIdMap(identifier)) { res.end(); return; }
   const {token, eventRes} = getFromIdMap(identifier);
+  updateRegistered(token, content, update);
   const message = eventMaker('message', {content, update});
   groupCast(token, message, eventRes);
   res.end();
@@ -111,10 +94,10 @@ app.listen(port, () => {
 
 // ---------------------------------- New Helpers ----------------------------------
 
-// `````````````````````````````````` Res Handlers and others``````````````````````````````````
+// `````````````````````````````````` Response Handlers and others``````````````````````````````````
 function authentication (token, newUser) {
-  newUser && registered.add(token);
-  return registered.has(token);
+  newUser && setRegistered(token);
+  return hasRegistered(token);
 }
 
 function invalidMessage(token, newUser, identifier) {
@@ -161,6 +144,36 @@ function closeCleanWrapper(token, identifier, res) {
     cleanGroup(res, token)
     res.end();
   }
+}
+// `````````````````````````````````` Registered Handlers ``````````````````````````````````
+function sendCache(token, res) {
+  // just for new connection
+  if (hasCachedContent(token)) {
+    sendSingleEvent(res, 'message', getRegistered(token))
+  }
+}
+function hasRegistered(token) {
+  return registered.has(token);
+}
+function hasCachedContent(token) {
+  if (!hasRegistered(token)) { return false; }
+  return getRegistered(token).update > 0;
+}
+function setRegistered(token, content="", update=0) {
+  registered.set(token, {content, update});
+}
+function getRegistered(token) {
+  if (!hasRegistered(token)) { return void 0; }
+  return registered.get(token);
+}
+function updateRegistered(token, content, update) {
+  if (!hasRegistered(token)) { return void 0; }
+  const existing = getRegistered(token).update;
+  if (update>existing) {
+    setRegistered(token, content, update);
+    return true;
+  }
+  return false;
 }
 // `````````````````````````````````` Waiting Handlers ``````````````````````````````````
 function addToWaiting(identifier, res) {
@@ -243,30 +256,27 @@ function deleteGroup(token) {
   connectMap.delete(token);
 }
 
-// ---------------------------------- Ancient APIs ----------------------------------
-app.post('/auth', (req, res)=>{
-  const {token, newUser} = req.body;
-  const validUser = authentication(token, newUser);
-  res.send({validUser});
-})
-
-app.get('/connect', (req, res) => {
-  clients.push(res);
-  setEventHeaders(res);
-  res.on('close', removeClient);
-
-  function removeClient() {
-    clients.splice(clients.indexOf(res), 1);
-    res.end();
+function cleanTimeOut(outTime=2000) {
+  for (const [identifier, {res, time}] of waitingRes) {
+    if (getTimeStamp()-time>outTime) {
+      res.end();
+      popFromWaiting(identifier);
+      deleteFromIdMap(identifier);
+    }
   }
-})
+}
 
-app.post('/receive', async (req, res) => {
-  res.status(200).end();
-  broadCast(req);
-})
-
-
+function logging() {
+  console.log('----------------------------------');
+  console.log('Registered', registered.size);
+  console.log('connectMap:')
+  for (const item of connectMap) {
+    console.log('  ', item[0], item[1].length);
+  }
+  console.log("waitingRes: ", waitingRes.size);
+  console.log("identifierMap: ", identifierMap.size);
+  console.log(' ');
+}
 
 //  ---------------------------------- Serve HTML (vite template) ----------------------------------
 async function requestRoot(req, res) {
@@ -331,7 +341,7 @@ async function requestRoot(req, res) {
 }
 
 
-
+/*
 // ---------------------------------- Abandoned APIs ----------------------------------
 app.post('/authentication', (req, res)=>{
   const {token, newUser} = req.body;
@@ -382,3 +392,29 @@ function broadCast(req) {
     isProduction && client.flush();
   });
 }
+
+// ---------------------------------- Ancient APIs ----------------------------------
+app.post('/auth', (req, res)=>{
+  const {token, newUser} = req.body;
+  const validUser = authentication(token, newUser);
+  res.send({validUser});
+})
+
+app.get('/connect', (req, res) => {
+  clients.push(res);
+  setEventHeaders(res);
+  res.on('close', removeClient);
+
+  function removeClient() {
+    clients.splice(clients.indexOf(res), 1);
+    res.end();
+  }
+})
+
+app.post('/receive', async (req, res) => {
+  res.status(200).end();
+  broadCast(req);
+})
+
+
+ */

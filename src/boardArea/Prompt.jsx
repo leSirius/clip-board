@@ -12,6 +12,7 @@ const issueMessages = [
   "Oh, you don't even have one piece of fish...",
   "Please do not modify the key.",
   "Whoops, there is some issue.",
+  "You know, I'm way nearsighted, can't find space."
 ];
 const hoverMessage = [
   "Restore Input means you already have a key and you'd like to enter it.",
@@ -27,8 +28,8 @@ export default function Prompt({tryConnect}) {
   const prevText = useRef("");
 
   const inputList = [
-    {tag: 'Your Name', value: name, handler: handlerMaker(setName)},
-    {tag: 'Cipher Key', value: key, handler: handlerMaker(setKey)}
+    {tag: 'Your Name', value: name, handler: handlerMaker(setName), stopSpace},
+    {tag: 'Cipher Key', value: key, handler: handlerMaker(setKey), stopSpace}
   ];
   const buttonList = [
     {tag: generated ? "Restore Input" : goFish ? "Go Fishing" : "Generate key", handler: genKey},
@@ -42,7 +43,7 @@ export default function Prompt({tryConnect}) {
           <Fragment key={item.tag}>
             <label htmlFor={item.tag} className='text-label'>{item.tag}</label>
             <input type="text" id={item.tag} className='input-login' spellCheck='false' maxLength={16}
-                   value={item.value} onChange={item.handler} disabled={ind === 1 && generated}
+                   value={item.value} onChange={item.handler} disabled={ind === 1 && generated} onKeyDown={item.stopSpace}
             />
           </Fragment>
         )}
@@ -63,6 +64,16 @@ export default function Prompt({tryConnect}) {
   function handlerMaker(func) {
     return (e) => {
       func(e.target.value);
+    }
+  }
+
+  function stopSpace(e) {
+    if (e.key===' ') {
+      e.preventDefault();
+      setHintText(issueMessages[4]);
+    }
+    else if (hintText===issueMessages[4]){
+      setHintText(hintMessages[2]);
     }
   }
 

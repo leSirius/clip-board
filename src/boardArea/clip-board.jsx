@@ -14,7 +14,7 @@ export default function ClipBoard() {
   const [total, setTotal] = useState(0);
 
   const timerId = useRef(null);
-  const lastUpdate = useRef(getTimeStamp());
+  const lastUpdate = useRef(0);
   const eventRef = useRef(null);
   const userRef = useRef("");
   const keyRef = useRef("");
