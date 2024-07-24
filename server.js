@@ -21,7 +21,7 @@ const waitingRes = new Map();                     // set(identifier, {res, time:
 const identifierMap = new Map();                  // set(identifier, {token, eventRes:res})
 setInterval(()=>{
   cleanTimeOut();
-  logging();
+  !isProduction && logging();
 }, 5000);
 // ---------------------------------- Init ----------------------------------
 // Cached production assets
