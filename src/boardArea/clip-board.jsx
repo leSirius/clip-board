@@ -47,6 +47,7 @@ export default function ClipBoard() {
           buttonList.map(item=><EffectedButton key={item.text} handler={item.handler}>{item.text}</EffectedButton>)
       }</div>
       <div className='count-info'>
+        <p>{lastUpdate.current}</p>
         <button className='button1 button-click-stretch button-click-shadow' title='Clear storage and disconnect' onClick={handleClear}>Clear</button>
         <p>{deviceNum===0? 'Waiting':`${deviceNum} / ${total}`}</p>
       </div>
@@ -105,7 +106,6 @@ export default function ClipBoard() {
 
   function handleCut() {
     const textArea = textAreaRef.current;
-
     textArea.select();
     document.execCommand('cut');
   }
