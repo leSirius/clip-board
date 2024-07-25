@@ -20,6 +20,14 @@ export default function ClipBoard() {
   const keyRef = useRef("");
   const tokenRef = useRef("");
   const identifierRef = useRef("");
+  const textAreaRef = useRef(null);
+
+  const buttonList = [
+    {text:'Copy', handler:handleCopy},
+    {text:'Cut', handler:handleCut},
+    {text:'SelectALL', handler:handleSelectAll},
+    // {text:'Paste', handler:handlePaste}
+  ]
 
   useEffect(() => {
     const [name, key] = storageFunc.getIterable(['name', 'key']);
@@ -28,17 +36,18 @@ export default function ClipBoard() {
     return cleanEventRef
   }, []);
 
+
 // ---------------------------------------------------- return ----------------------------------------------
   return (
     <>
       {showOverlay && <Prompt tryConnect={tryConnect}></Prompt>}
       <TitleBox userName={userRef.current??''} userKey={keyRef.current??''}></TitleBox>
-      <textarea className='text-area' value={content} onChange={handleTextInput}/>
-      <div className='button-box'>
-        <button className='button1'>Copy</button>
-      </div>
+      <textarea ref={textAreaRef} className='text-area' value={content} onChange={handleTextInput}/>
+      <div className='button-box'>{
+          buttonList.map(item=><EffectedButton key={item.text} handler={item.handler}>{item.text}</EffectedButton>)
+      }</div>
       <div className='count-info'>
-        <button className='button1' title='Clear storage and disconnect' onClick={handleClear}>Clear</button>
+        <button className='button1 button-click-stretch button-click-shadow' title='Clear storage and disconnect' onClick={handleClear}>Clear</button>
         <p>{deviceNum===0? 'Waiting':`${deviceNum} / ${total}`}</p>
       </div>
     </>
@@ -84,6 +93,25 @@ export default function ClipBoard() {
       const body = JSON.stringify({content: encryptText, update: update, identifier: identifierRef.current});
       makeFetch(urls.text, true, body);
     }
+  }
+
+
+  function handleCopy() {
+    const textArea = textAreaRef.current;
+    textArea.select();
+    document.execCommand('copy');
+    document.getSelection().removeAllRanges();
+  }
+
+  function handleCut() {
+    const textArea = textAreaRef.current;
+
+    textArea.select();
+    document.execCommand('cut');
+  }
+  function handleSelectAll() {
+    const textArea = textAreaRef.current;
+    textArea.select();
   }
 
   function handleClear() {
@@ -175,21 +203,63 @@ export default function ClipBoard() {
 // ---------------------------------- Title and Info -----------------------------------
 function TitleBox({userName, userKey}) {
   const [showInfo, setShowInfo] = useState(false);
+  const container = useRef(void 0);
+  const onButton = useRef(false);
+
   return (
     <div className='titleBox'>
       <h2>Clip Board</h2>
-      <p>
-        <b>{showInfo ? `${userName}` : ""}</b>
-        <span className='unselect'>&nbsp;&nbsp;</span>
-        {showInfo ? `${userKey}` : ""}
-        <span className='unselect'>&nbsp;&nbsp;&nbsp;</span>
-        <button className='button-sm unselect' onClick={() => setShowInfo(!showInfo)}>
+      <div tabIndex={0} ref={container}
+           onBlur={ handleDivBlur }>
+        <button
+          className='button-sm unselect button-click-op button-click-stretch button-click-shadow' tabIndex={-1}
+          onClick={ handleClick }
+          onBlur={ handleBlur }
+          onMouseEnter={ enterButton }
+          onMouseLeave={ leaveButton }
+        >
           {showInfo ? "Hide Info" : "Show Info"}
         </button>
-      </p>
+        {
+          showInfo &&
+          <div className='info-board'>
+            <p>{userName}<br />{userKey}</p>
+          </div>
+        }
+      </div>
     </div>
   )
+
+  function handleClick() {
+    container.current.focus();
+    setShowInfo(!showInfo);
+  }
+
+  function handleBlur(e){
+    e.stopPropagation();
+  }
+
+  function handleDivBlur() {
+    !onButton.current && setShowInfo(false);
+  }
+
+  function enterButton() {
+    onButton.current = true;
+  }
+  function leaveButton() {
+    onButton.current = false;
+
+  }
+
 }
+
+
+function EffectedButton({children, handler}) {
+  return <button className='button1 button-reflect button-click-op button-click-stretch button-click-shadow' onClick={handler}>{children}</button>
+}
+
+
+
 
 /*
 useEffect(() => {

@@ -5,21 +5,27 @@ $gray3: #353535;
 $gray4: #424242;
 $gray5: #505050;
 $gray7: #707070;
+$green6: #16a34a;
 
 @mixin button-common($color: $gray7){
+  border: none;
   background-color: $color;
   border-radius: 8px;
-  border: 1px solid transparent;
-
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 0.25s, opacify 0.25s;
-
+  position: relative;
 
   &:hover {
-    border-color: #6f6fff;
-    opacity: 70%;
+    animation: .4s ease-in ;;
+    opacity: 65%;
+    transition: border-color 0.9s, opacity .25s;
   }
+
 }
+
+
+
+
+

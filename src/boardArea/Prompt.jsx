@@ -28,7 +28,7 @@ export default function Prompt({tryConnect}) {
   const prevText = useRef("");
 
   const inputList = [
-    {tag: 'Your Name', value: name, handler: handlerMaker(setName), stopSpace},
+    {tag: 'Your Name', value: name, handler: handleName, stopSpace},
     {tag: 'Cipher Key', value: key, handler: handlerMaker(setKey), stopSpace}
   ];
   const buttonList = [
@@ -49,7 +49,7 @@ export default function Prompt({tryConnect}) {
         )}
         {
           buttonList.map(item =>
-            <button className='button2' key={item.tag} onClick={item.handler} onMouseEnter={onButton}
+            <button className='button2 button-click-op' key={item.tag} onClick={item.handler} onMouseEnter={onButton}
                     onMouseLeave={offButton}>{item.tag}</button>
           )}
 
@@ -65,6 +65,12 @@ export default function Prompt({tryConnect}) {
     return (e) => {
       func(e.target.value);
     }
+  }
+
+  function handleName(e) {
+    const str = e.target.value;
+    if (str.indexOf(' ')===-1) { setName(str); }
+    else { stopSpace({key: ' '}); }
   }
 
   function stopSpace(e) {

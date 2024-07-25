@@ -19,6 +19,22 @@
   align-items: baseline;
 }
 
+.info-board {
+  margin: 0;
+  font-weight: 500;
+  border: 1px solid common.$gray5;
+  box-shadow: 4px 1px 8px 1px common.$gray1;
+  padding: 0 .75rem;
+  background-color: common.$gray4;
+  position: absolute;
+  top: 20%;
+  right: 11.8%;
+  width: fit-content;
+  height: fit-content;
+  border-radius: 8px;
+  animation: .12s ease-in 1  simple-fade-in;
+}
+
 
 .text-area {
   box-sizing: border-box;
@@ -37,12 +53,13 @@
 }
 
 .button1 {
-  @include common.button-common;
+  @include common.button-common($color: common.$green6);
   font-size: 1.125rem;
   padding: .425rem 1.325rem;
   letter-spacing: .025rem;
   margin-right: .5px;
 }
+
 
 .button2 {
   @include common.button-common($color: common.$gray4);
@@ -61,6 +78,72 @@
   min-width: 5rem;
 }
 
+.button-reflect {
+  &::after {
+    height: 75%;
+    transform: translate(.32rem, 140%) skew(22deg);
+    mask: linear-gradient(
+                    to right,
+                    rgba(255, 255, 255, .15),
+                    rgba(255,255,255,0.34) 25%,
+                    rgba(255,255,255,.45) 50%,
+                    rgba(255,255,255,0.34) 75%,
+                    rgba(255, 255, 255, .15)
+    ),
+    linear-gradient(
+                    rgba(255,255,255,1),
+                    rgba(255,255,255,0.75) 25%,
+                    rgba(255,255,255,0.52) 50%,
+                    rgba(255,255,255,0.22) 75%,
+                    rgba(255,255,255,0.01)
+    );
+    mask-composite: intersect;
+    mask-repeat: no-repeat;
+
+    background-color: common.$green6;
+    border-radius: 8px;
+    content: attr(content);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+
+  }
+}
+
+.button-click-op {
+  &:active {
+    opacity: 90%;
+  }
+
+}
+
+.button-click-stretch {
+  &:active {
+    transform: scaleX(1.15);
+    transition: transform ease-out .2s;
+  }
+
+}
+
+.button-click-shadow {
+  &::before {
+    position: absolute;
+    background-color: transparent;
+    border-radius: 8px;
+    inset: 0;
+    content: attr(content);
+    box-shadow: 0.5rem  0 transparent,
+                -0.5rem 0 transparent;
+    transition: 0.5s;
+  }
+  &:active::before {
+    box-shadow: 0 0 common.$green6,
+                0 0 common.$green6;
+    transition: 0s;
+  }
+}
+
+
 .unselect {
   user-select: none;
 }
@@ -68,17 +151,20 @@
 .button-box {
   margin-top: .75rem;
   text-align: right;
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 1rem;
 }
 
-
 .overlay {
-  background-color: rgba(200,200,200,0.3);
+  background-color: rgba(200,200,200,0.2);
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
   z-index: 1;
+  animation: .5s ease-in 1 open-screen;
 }
 
 .inputForm {
@@ -94,6 +180,7 @@
   display: flex;
   flex-flow: column;
   gap: .5rem;
+  animation: .4s ease-in 1 simple-fade-in;
 }
 
 .text-label {
@@ -114,6 +201,7 @@
   user-select: none;
   overflow: hidden;
 }
+
 .hint-icon {
   margin-right: .375rem;
   vertical-align: bottom;
@@ -131,7 +219,103 @@
 
 .count-info {
   position: fixed;
-  right: 1.8rem;
-  bottom: 0.9rem;
+  right: 1.2rem;
+  bottom: 0.6rem;
   text-align: center;
 }
+
+
+@keyframes simple-fade-in {
+  0% {
+    opacity: 30%;
+  }
+  100% {
+    opacity: 100%;
+  }
+}
+
+@keyframes open-screen {
+  0% {
+    mask: radial-gradient(transparent, transparent);
+  }
+  8.4% {
+    mask: radial-gradient(
+                    rgba(255, 255, 255, 0.167) 0%,
+                    rgba(255,255,255,0.01) 16.7%,
+                    transparent
+    );
+  }
+  16.7% {
+    mask: radial-gradient(
+                    rgba(255, 255, 255, 0.333) 0%,
+                    rgba(255,255,255,0.01) 33.3%,
+                    transparent
+    );
+  }
+  25% {
+    mask: radial-gradient(
+                    rgba(255, 255, 255, 0.5) 0%,
+                    rgba(255,255,255,0.01) 50%,
+                    transparent
+    );
+  }
+  33.3% {
+    mask: radial-gradient(
+                    rgba(255,255,255,0.667) 0%,
+                    rgba(255,255,255,0.01) 66.7%,
+                    transparent
+    );
+  }
+  42.6% {
+    mask: radial-gradient(
+                    rgba(255,255,255,0.833) 0%,
+                    rgba(255, 255, 255, 0.1) 83.3%,
+                    transparent
+    );
+  }
+  50% {
+    mask: radial-gradient(
+                    rgba(255,255,255,1) 0%,
+                    rgba(255, 255, 255, 0.01) 100%
+    );
+  }
+  58.3% {
+    mask: radial-gradient(
+                    white,
+                    rgba(255,255,255,1) 58.3%,
+                    rgba(255, 255, 255, 0.167) 100%
+    );
+  }
+  66.7% {
+    mask: radial-gradient(
+                    white,
+                    rgba(255,255,255,1) 66.7%,
+                    rgba(255, 255, 255, 0.333) 100%
+    );
+  }
+  75% {
+    mask: radial-gradient(
+                    white,
+                    rgba(255,255,255,1) 75%,
+                    rgba(255, 255, 255, 0.5) 100%
+    );
+  }
+  83.3% {
+    mask: radial-gradient(
+                    white,
+                    rgba(255,255,255,1) 83.3%,
+                    rgba(255, 255, 255, 0.667) 100%
+    );
+  }
+  93.6% {
+    mask: radial-gradient(
+                    white,
+                    rgba(255,255,255,1) 93.6%,
+                    rgba(255, 255, 255, 0.833)100%
+    );
+  }
+  100% {
+    mask: radial-gradient( white, white );
+  }
+}
+
