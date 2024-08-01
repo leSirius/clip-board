@@ -11,7 +11,7 @@ const base = process.env.BASE || '/'
 const ABORT_DELAY = 10000;
 const clients = [];
 
-// sirius 1111111111111111 Eq/QbSt9kKwbdcvYQ+VfuQ==    sirius 2222222222222222 lGu/FRhEiq7F8vgfjraEHA==
+// sirius 1111111111111111 Eq/QbSt9kKwbdcvYQ+VfuQ==             // sirius 2222222222222222 lGu/FRhEiq7F8vgfjraEHA==
 const registered = new Map([
   ['Eq/QbSt9kKwbdcvYQ+VfuQ==', {content:"", update:0}],
   ['lGu/FRhEiq7F8vgfjraEHA==', {content:"", update:0}]
@@ -24,6 +24,7 @@ setInterval(()=>{
   !isProduction && logging();
 }, 5000);
 // ---------------------------------- Init ----------------------------------
+
 // Cached production assets
 const templateHtml = isProduction
   ? await fs.readFile('./dist/client/index.html', 'utf-8')
@@ -77,6 +78,13 @@ app.post(urls.identify, (req, res)=>{
   groupCast(token, message, eventRes);
 });
 
+app.post(urls.disconnect, (req, res)=>{
+  const {identifier} = req.body;
+  const info = getFromIdMap(identifier);
+  if (info!==void 0) { sendSingleEvent(info.eventRes,'test'); }
+  res.end();
+});
+
 app.post(urls.text, (req, res)=>{
   const {identifier, content, update} = req.body;
   if (!hasInIdMap(identifier)) { res.end(); return; }
@@ -111,7 +119,7 @@ function setEventHeaders(res) {
   res.flushHeaders();
 }
 function eventMaker(type, data) {
-  const typeList = new Set(["identifier", "success", "fail", "count", "message", "reduce"]);
+  const typeList = new Set(["identifier", "success", "fail", "count", "message", "reduce", "test"]);
   if (!typeList.has(type)) { console.log(`Non-recorded event type ${type} !!!!!!!!!!!!!!!!!!!!!!!!!!!!`); }
 
   if (typeof data!=='string') { data = JSON.stringify(data); }
@@ -238,15 +246,18 @@ function addNewGroup(token) {
 }
 
 function cleanGroup(res, token) {
-  const group = getGroup(token);
-  const index = group.indexOf(res)
+  let group, index;
+  try {
+    group = getGroup(token);
+    index = group.indexOf(res);
+  }
+  catch { return ; }
+
   group.splice(index, 1);
   if (group.length===0) { deleteGroup(token); }
   else {
     group.forEach((client,ind)=>{
-      const message = ind<index
-        ? eventMaker('reduce', {deviceNum:0, total:-1})
-        : eventMaker('reduce', {deviceNum:-1, total:-1});
+      const message = eventMaker('reduce', {deviceNum:ind+1, total:group.length})
       writeFlush(client, message);
     })
   }

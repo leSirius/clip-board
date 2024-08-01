@@ -128,6 +128,7 @@ export default function ClipBoard() {
     try {
       const result = await promisifyEventSource(token, newUser);
       handleSuccess(result);
+      window.onbeforeunload = disconnect;
     }
     catch (e) {
       setHint && setHint(e.message);
@@ -162,8 +163,8 @@ export default function ClipBoard() {
   }
 
   function onReduce(data) {
-    setDeviceNum(num=>num+data.deviceNum);
-    setTotal(tot=>tot+data.total);
+    setDeviceNum(data.deviceNum);
+    setTotal(data.total);
   }
 
   function onMessage(data) {
@@ -177,6 +178,11 @@ export default function ClipBoard() {
   function onError(e) {
     console.error(e);
     restoreAll();
+  }
+
+  function disconnect() {
+    const identifier = identifierRef.current;
+    makeFetch(urls.disconnect, true, {identifier}, false);
   }
 
   function resetDeviceNumbers(num=0) {

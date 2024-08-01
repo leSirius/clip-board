@@ -3,7 +3,8 @@ import CryptoJS from "crypto-js";
 export const urls = {
   eventSource: "/eventsource",
   identify: "/identify",
-  text: "/text"
+  text: "/text",
+  disconnect: "/disconnect"
 }
 
 const iv = new Array(16).fill(String.fromCharCode(0)).join('');
