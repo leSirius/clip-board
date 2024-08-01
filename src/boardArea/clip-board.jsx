@@ -42,12 +42,12 @@ export default function ClipBoard() {
     <>
       {showOverlay && <Prompt tryConnect={tryConnect}></Prompt>}
       <TitleBox userName={userRef.current??''} userKey={keyRef.current??''}></TitleBox>
+      <p>{lastUpdate.current}</p>
       <textarea ref={textAreaRef} className='text-area' value={content} onChange={handleTextInput}/>
       <div className='button-box'>{
           buttonList.map(item=><EffectedButton key={item.text} handler={item.handler}>{item.text}</EffectedButton>)
       }</div>
       <div className='count-info'>
-        <p>{lastUpdate.current}</p>
         <button className='button1 button-click-stretch button-click-shadow' title='Clear storage and disconnect' onClick={handleClear}>Clear</button>
         <p>{deviceNum===0? 'Waiting':`${deviceNum} / ${total}`}</p>
       </div>

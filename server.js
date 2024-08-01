@@ -282,7 +282,6 @@ function logging() {
 async function requestRoot(req, res) {
   try {
     const url = req.originalUrl.replace(base, '')
-
     let template
     let render
     if (!isProduction) {
