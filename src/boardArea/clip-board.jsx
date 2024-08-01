@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from "react";
 import Prompt from "./Prompt.jsx";
+import TitleBox from "./title-box.jsx";
 import {
   urls, cipher, decipher, storageFunc, getTimeStamp, makeFetch, promisifyEventSource
 } from "../toolkit/utility.js";
@@ -42,7 +43,6 @@ export default function ClipBoard() {
     <>
       {showOverlay && <Prompt tryConnect={tryConnect}></Prompt>}
       <TitleBox userName={userRef.current??''} userKey={keyRef.current??''}></TitleBox>
-      <p>{lastUpdate.current}</p>
       <textarea ref={textAreaRef} className='text-area' value={content} onChange={handleTextInput}/>
       <div className='button-box'>{
           buttonList.map(item=><EffectedButton key={item.text} handler={item.handler}>{item.text}</EffectedButton>)
@@ -197,62 +197,6 @@ export default function ClipBoard() {
     resetDeviceNumbers();
   }
 }
-
-
-
-// ---------------------------------- Title and Info -----------------------------------
-function TitleBox({userName, userKey}) {
-  const [showInfo, setShowInfo] = useState(false);
-  const container = useRef(void 0);
-  const onButton = useRef(false);
-
-  return (
-    <div className='titleBox'>
-      <h2>Clip Board</h2>
-      <div tabIndex={0} ref={container}
-           onBlur={ handleDivBlur }>
-        <button
-          className='button-sm unselect button-click-op button-click-stretch button-click-shadow' tabIndex={-1}
-          onClick={ handleClick }
-          onBlur={ handleBlur }
-          onMouseEnter={ enterButton }
-          onMouseLeave={ leaveButton }
-        >
-          {showInfo ? "Hide Info" : "Show Info"}
-        </button>
-        {
-          showInfo &&
-          <div className='info-board'>
-            <p>{userName}<br />{userKey}</p>
-          </div>
-        }
-      </div>
-    </div>
-  )
-
-  function handleClick() {
-    container.current.focus();
-    setShowInfo(!showInfo);
-  }
-
-  function handleBlur(e){
-    e.stopPropagation();
-  }
-
-  function handleDivBlur() {
-    !onButton.current && setShowInfo(false);
-  }
-
-  function enterButton() {
-    onButton.current = true;
-  }
-  function leaveButton() {
-    onButton.current = false;
-
-  }
-
-}
-
 
 function EffectedButton({children, handler}) {
   return <button className='button1 button-reflect button-click-op button-click-stretch button-click-shadow' onClick={handler}>{children}</button>
