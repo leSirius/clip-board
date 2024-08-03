@@ -57,11 +57,13 @@ export default function ClipBoard() {
   // ------------------------------------------- Helpers ---------------------------------------------
 
   function cleanEventRef() {
-    eventRef.current && eventRef.current.close();
+    if (eventRef.current === null) { return; }
+    const identifier = identifierRef.current;
+    eventRef.current.close();
     eventRef.current = null;
+    identifier!=="" && makeFetch(urls.disconnect, true, {identifier}, false);
   }
   function setEvenRef(eventOb) {
-    cleanEventRef();
     eventRef.current = eventOb;
   }
   function setUserInfo(name, key, eventOb, identifier) {
@@ -128,7 +130,7 @@ export default function ClipBoard() {
     try {
       const result = await promisifyEventSource(token, newUser);
       handleSuccess(result);
-      window.onbeforeunload = disconnect;
+      window.onbeforeunload = cleanEventRef;
     }
     catch (e) {
       setHint && setHint(e.message);
@@ -145,16 +147,19 @@ export default function ClipBoard() {
   }
 
   function setInfoListeners(eventOb) {
-    eventOb.addEventListener('message', jsonParser(onMessage));
-    eventOb.addEventListener('count', jsonParser(onCount));
-    eventOb.addEventListener('reduce', jsonParser(onReduce));
+    eventOb.addEventListener('message', parseWrapper(onMessage));
+    eventOb.addEventListener('count', parseWrapper(onCount));
+    eventOb.addEventListener('reduce', parseWrapper(onReduce));
     eventOb.addEventListener('error', onError);
   }
 
-  function jsonParser(func) {
+  function parseWrapper(func) {
     return (e)=>{
-      const data = JSON.parse(e.data);
-      func(data);
+      try {
+        const data = JSON.parse(e.data);
+        func(data);
+      }
+      catch(err) { console.error(err); }
     }
   }
 
@@ -180,11 +185,6 @@ export default function ClipBoard() {
     restoreAll();
   }
 
-  function disconnect() {
-    const identifier = identifierRef.current;
-    makeFetch(urls.disconnect, true, {identifier}, false);
-  }
-
   function resetDeviceNumbers(num=0) {
     setDeviceNum(num);
     setTotal(num);
@@ -192,11 +192,11 @@ export default function ClipBoard() {
 
   function restoreAll() {
     // timerId is not included
+    cleanEventRef();
     userRef.current = "";
     keyRef.current = "";
     tokenRef.current = "";
     identifierRef.current = "";
-    cleanEventRef();
     lastUpdate.current = getTimeStamp();
     setContent("");
     setShowOverlay(true);

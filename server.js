@@ -78,13 +78,6 @@ app.post(urls.identify, (req, res)=>{
   groupCast(token, message, eventRes);
 });
 
-app.post(urls.disconnect, (req, res)=>{
-  const {identifier} = req.body;
-  const info = getFromIdMap(identifier);
-  if (info!==void 0) { sendSingleEvent(info.eventRes,'test'); }
-  res.end();
-});
-
 app.post(urls.text, (req, res)=>{
   const {identifier, content, update} = req.body;
   if (!hasInIdMap(identifier)) { res.end(); return; }
@@ -94,6 +87,13 @@ app.post(urls.text, (req, res)=>{
   groupCast(token, message, eventRes);
   res.end();
 })
+
+app.post(urls.disconnect, (req, res)=>{
+  const {identifier} = req.body;
+  const info = getFromIdMap(identifier);
+  if (info!==void 0) { sendSingleEvent(info.eventRes,'test'); }
+  res.end();
+});
 
 // Start http server
 app.listen(port, () => {
